@@ -1,0 +1,64 @@
+{
+  "id": "account",
+  "name": "个人信息账号配置",
+  "script": {
+    "formItems": [
+      {
+        "name": "authType",
+        "type": "RADIO",
+        "label": "认证方式",
+        "value": "basic",
+        "tooltip": "私有化部署选择 Basic Auth 填写账号密码, 选择 Bearer Token 填写 Token, SaaS 版本只能选择 Basic Auth, 填写(账号+令牌)(账户设置-安全-创建API令牌)",
+        "options": [
+          {
+            "value": "basic",
+            "text": "Basic Auth"
+          },
+          {
+            "value": "bearer",
+            "text": "Bearer Token"
+          }
+        ]
+      },
+      {
+        "name": "jiraAccount",
+        "type": "INPUT",
+        "label": "JIRA账号",
+        "required": true,
+        "displayConditions": {
+          "field": "authType",
+          "value": "basic"
+        }
+      },
+      {
+        "name": "jiraPassword",
+        "type": "PASSWORD",
+        "label": "JIRA密码",
+        "required": true,
+        "displayConditions": {
+          "field": "authType",
+          "value": "basic"
+        }
+      },
+      {
+        "name": "token",
+        "type": "INPUT",
+        "label": "Token",
+        "required": true,
+        "displayConditions": {
+          "field": "authType",
+          "value": "bearer"
+        }
+      },
+      {
+        "name": "nickName",
+        "type": "INPUT",
+        "label": "昵称",
+        "value": "",
+        "required": false,
+        "platformPlaceHolder": "请录入登录账号对应的昵称以便工作台进行数据统计",
+        "tooltip": "hover右上角头像即可查看昵称"
+      }
+    ]
+  }
+}

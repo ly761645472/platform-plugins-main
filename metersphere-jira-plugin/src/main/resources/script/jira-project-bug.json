@@ -1,0 +1,34 @@
+{
+  "id": "project_bug",
+  "name": "缺陷管理",
+  "script": {
+    "formItems": [
+      {
+        "name": "jiraKey",
+        "type": "INPUT",
+        "label": "project.menu.projectKey",
+        "value": "",
+        "required": true,
+        "subDesc": "如何获取JIRA项目Key",
+        "inputSearch": false,
+        "instructionsIcon": "static/jira-key.png",
+        "platformPlaceHolder": "请输入项目Key并验证",
+        "optionMethod": "",
+        "couplingConfig": {}
+      },
+      {
+        "name": "jiraBugTypeId",
+        "type": "SELECT",
+        "label": "project.menu.defectType",
+        "value": "",
+        "required": true,
+        "inputSearch": true,
+        "optionMethod": "getBugType",
+        "couplingConfig": {
+          "type": "initOptions",
+          "cascade": "jiraKey"
+        }
+      }
+    ]
+  }
+}
