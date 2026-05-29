@@ -29,7 +29,7 @@ public class JiraClientTest2 {
     // ====================== 全局配置 ======================
     private static final String JIRA_URL = "https://fit2cloudtest.atlassian.net";
     private static final String EMAIL = "yue.lu@fit2cloud.com";
-    private static final String API_TOKEN = "ATATT3xFfGF0JPmCqYkz2AbJB7o4t4tFEzPP7TGRYrwKBw75zidNY9OPzDkjfvsWbSBR-5MOuybmbXM64RI5Hx_HZQnC8XonT_Q2h3XrolOu0WzV3YgjW9emrNVnPoIyqlES1yTy6F0s-ITFCkUzLrs715PSoRMqDFrTlAB8wKnOXlYHp5kkydQ=CC8265C1";
+    private static final String API_TOKEN = "";//"ATATT3xFfGF0JPmCqYkz2AbJB7o4t4tFEzPP7TGRYrwKBw75zidNY9OPzDkjfvsWbSBR-5MOuybmbXM64RI5Hx_HZQnC8XonT_Q2h3XrolOu0WzV3YgjW9emrNVnPoIyqlES1yTy6F0s-ITFCkUzLrs715PSoRMqDFrTlAB8wKnOXlYHp5kkydQ=CC8265C1";
 
     private JiraDefaultClient client;
     private JiraPlatform jiraPlatform;
@@ -264,7 +264,7 @@ public class JiraClientTest2 {
         // 2. 准备高级参数（测试时如果不需要，直接传 null）
         SyncAllBugRequest syncRequest = null; // 用于增量同步的时间过滤，普通查询传 null
         String fields = null;                 // 指定返回字段，传 null 则默认返回 *all,-comment
-        String nextPageToken=null;
+        String nextPageToken = null;
         try {
             System.out.println("🔍 正在获取项目 [" + projectKey + "] 下类型为 [" + issueType + "] 的缺陷列表...");
 
@@ -275,7 +275,7 @@ public class JiraClientTest2 {
                     projectKey,
                     issueType,
                     syncRequest,
-                    fields,nextPageToken
+                    fields, nextPageToken
             );
 
             if (result != null && result.getIssues() != null) {
