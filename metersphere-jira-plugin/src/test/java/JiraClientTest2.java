@@ -1,8 +1,16 @@
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.metersphere.plugin.jira.client.JiraDefaultClient;
+import io.metersphere.plugin.jira.constants.JiraMetadataField;
 import io.metersphere.plugin.jira.domain.*;
+import io.metersphere.plugin.jira.impl.JiraPlatform;
+import io.metersphere.plugin.platform.dto.SyncBugResult;
+import io.metersphere.plugin.platform.dto.request.PlatformRequest;
 import io.metersphere.plugin.platform.dto.request.SyncAllBugRequest;
+import io.metersphere.plugin.platform.dto.request.SyncPostParamRequest;
+import io.metersphere.plugin.platform.dto.response.PlatformBugDTO;
+import io.metersphere.plugin.platform.dto.response.PlatformCustomFieldItemDTO;
+import io.metersphere.plugin.sdk.util.PluginLogUtils;
 import io.micrometer.common.util.StringUtils;
 import org.junit.Before;
 import org.junit.Test;
@@ -11,16 +19,20 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class JiraClientTest2 {
 
     // ====================== 全局配置 ======================
     private static final String JIRA_URL = "https://fit2cloudtest.atlassian.net";
     private static final String EMAIL = "yue.lu@fit2cloud.com";
-    private static final String API_TOKEN = "ATATT3xFfGF0f2JnRRcT3M6Z0BpO-R1aK6wVJT_yiHMRHsqq93izp0XnnkvhWxrut2Fn3w_DtCxIAvc-lS4mND-CutT63dCVSo5ZmuPjgtkwxdm21kOCe4etOKROP9vst4NuUmNnc2SGpVb4ME4Co7pgHLIezHbNRfYKf0o45NXf56dHmxfUaHY=BF256997";
+    private static final String API_TOKEN = "ATATT3xFfGF0JPmCqYkz2AbJB7o4t4tFEzPP7TGRYrwKBw75zidNY9OPzDkjfvsWbSBR-5MOuybmbXM64RI5Hx_HZQnC8XonT_Q2h3XrolOu0WzV3YgjW9emrNVnPoIyqlES1yTy6F0s-ITFCkUzLrs715PSoRMqDFrTlAB8wKnOXlYHp5kkydQ=CC8265C1";
 
     private JiraDefaultClient client;
+    private JiraPlatform jiraPlatform;
 
     @Before
     public void setUp() {
@@ -52,7 +64,7 @@ public class JiraClientTest2 {
         String projectKey = "KAN";
         String issueType = "Task";
         int startAt = 1;
-        int maxResults = 5;
+        int maxResults = 5000;
         String queryKeyword = ""; // 可选关键词
 
         try {
@@ -214,8 +226,8 @@ public class JiraClientTest2 {
     // ==================================================================================
     @Test
     public void testAddIssue() {
-        String projectKey = "KAN";
-        String issueTypeName = "Task";
+        String projectKey = "BQKY";
+        String issueTypeName = "BUG";
         String summary = "【自动化测试】通过重构后的 Client 创建";
 
         try {
@@ -245,14 +257,14 @@ public class JiraClientTest2 {
     public void testGetProjectIssues() {
         // 1. 准备基础查询参数
         Integer startAt = 1;           // 从第 0 条开始查
-        Integer maxResults = 5;       // 每次最多查 10 条
-        String projectKey = "KAN";     // 替换成你要查询的真实项目 Key
-        String issueType = "Task";      // 替换成你要查询的缺陷类型（如 Bug, Task, Story）
+        Integer maxResults = 5000;       // 每次最多查 10 条
+        String projectKey = "BQKY";     // 替换成你要查询的真实项目 Key
+        String issueType = "BUG";      // 替换成你要查询的缺陷类型（如 Bug, Task, Story）
 
         // 2. 准备高级参数（测试时如果不需要，直接传 null）
         SyncAllBugRequest syncRequest = null; // 用于增量同步的时间过滤，普通查询传 null
         String fields = null;                 // 指定返回字段，传 null 则默认返回 *all,-comment
-
+        String nextPageToken=null;
         try {
             System.out.println("🔍 正在获取项目 [" + projectKey + "] 下类型为 [" + issueType + "] 的缺陷列表...");
 
@@ -263,7 +275,7 @@ public class JiraClientTest2 {
                     projectKey,
                     issueType,
                     syncRequest,
-                    fields
+                    fields,nextPageToken
             );
 
             if (result != null && result.getIssues() != null) {
@@ -531,5 +543,203 @@ public class JiraClientTest2 {
             e.printStackTrace();
         }
     }
+
+    @Test
+    public void testBatchAddIssues() {
+        String projectKey = "BQKY";
+        String issueTypeName = "BUG";
+        String baseSummary = "jira-data-"; // 缺陷名称前缀
+
+        int totalCount = 5500;      // 总创建数量
+        int batchSize = 100;        // 每批次创建的数量（防止瞬间请求过多被限流）
+        int sleepTimeMs = 500;      // 每批次之间的休眠时间（毫秒）
+
+        System.out.println("🚀 开始批量创建 " + totalCount + " 条缺陷数据...");
+        long startTime = System.currentTimeMillis();
+        int successCount = 0;
+        int failCount = 0;
+
+        try {
+            for (int i = 1; i <= totalCount; i++) {
+                String currentSummary = baseSummary + i; // 动态生成编号
+
+                // 构建 JSON Body
+                String jsonBody = String.format(
+                        "{ \"fields\": { \"project\": { \"key\": \"%s\" }, \"issuetype\": { \"name\": \"%s\" }, \"summary\": \"%s\", \"description\": \"批量自动化测试数据，编号: %d\" } }",
+                        projectKey, issueTypeName, currentSummary, i
+                );
+
+                try {
+                    // ✅ 核心调用：直接使用 client.addIssue
+                    JiraAddIssueResponse response = client.addIssue(jsonBody, new HashMap<>());
+
+                    successCount++;
+                    // 每成功创建 100 条打印一次进度，避免控制台刷屏
+                    if (i % 100 == 0) {
+                        System.out.println("✅ 已提交 " + i + " 条，最新创建的 Key: " + response.getKey());
+
+                        // 防限流休眠：每处理完一个批次，暂停一下
+                        Thread.sleep(sleepTimeMs);
+                    }
+                } catch (Exception e) {
+                    failCount++;
+                    System.err.println("❌ 第 " + i + " 条创建失败 (" + currentSummary + "): " + e.getMessage());
+                }
+            }
+
+            long endTime = System.currentTimeMillis();
+            double durationSeconds = (endTime - startTime) / 1000.0;
+
+            System.out.println("\n================= 批量创建完成 =================");
+            System.out.println("⏱️ 总耗时: " + durationSeconds + " 秒");
+            System.out.println("✅ 成功数量: " + successCount + " 条");
+            System.out.println("❌ 失败数量: " + failCount + " 条");
+            System.out.println("=============================================");
+
+        } catch (Exception e) {
+            System.err.println("⚠️ 批量创建过程被中断！");
+            e.printStackTrace();
+        }
+    }
+
+
+    @Test
+    public void testBatchAddIssuesMultiThread() throws InterruptedException {
+        String projectKey = "LUYT";
+        String issueTypeName = "BUG";
+        String baseSummary = "jira-data-";
+
+        int totalCount = 5500;      // 总创建数量
+        int threadPoolSize = 10;    // 线程池大小（建议根据Jira服务器性能调整，一般5-20之间）
+        int batchSize = 100;        // 每个线程每次处理的批次大小
+
+        System.out.println("🚀 开始使用 " + threadPoolSize + " 个线程批量创建 " + totalCount + " 条缺陷数据...");
+        long startTime = System.currentTimeMillis();
+
+        // 使用 AtomicInteger 保证多线程环境下计数器的线程安全
+        java.util.concurrent.atomic.AtomicInteger successCount = new AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger failCount = new AtomicInteger(0);
+        // 用于等待所有线程执行完毕
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(totalCount);
+        // 创建固定大小的线程池
+        java.util.concurrent.ExecutorService executorService = java.util.concurrent.Executors.newFixedThreadPool(threadPoolSize);
+
+        for (int i = 1; i <= totalCount; i++) {
+            final int currentIndex = i; // 保存当前编号的副本供线程使用
+
+            // 将任务提交给线程池执行
+            executorService.execute(() -> {
+                try {
+                    String currentSummary = baseSummary + currentIndex;
+
+                    // 构建 JSON Body
+                    String jsonBody = String.format(
+                            "{ \"fields\": { \"project\": { \"key\": \"%s\" }, \"issuetype\": { \"name\": \"%s\" }, \"summary\": \"%s\", \"description\": \"多线程批量测试数据，编号: %d\" } }",
+                            projectKey, issueTypeName, currentSummary, currentIndex
+                    );
+
+                    // ✅ 核心调用
+                    client.addIssue(jsonBody, new HashMap<>());
+
+                    successCount.incrementAndGet();
+                    // 每成功创建 500 条打印一次进度
+                    if (successCount.get() % 500 == 0) {
+                        System.out.println("✅ 已成功创建 " + successCount.get() + " 条...");
+                    }
+                } catch (Exception e) {
+                    failCount.incrementAndGet();
+                    System.err.println("❌ 第 " + currentIndex + " 条创建失败 (" + baseSummary + currentIndex + "): " + e.getMessage());
+                } finally {
+                    // 无论成功还是失败，都让计数器减一
+                    latch.countDown();
+                }
+            });
+        }
+
+        // ⚠️ 主线程阻塞等待，直到所有任务都执行完毕
+        latch.await();
+
+        // 关闭线程池
+        executorService.shutdown();
+
+        long endTime = System.currentTimeMillis();
+        double durationSeconds = (endTime - startTime) / 1000.0;
+
+        System.out.println("\n================= 多线程批量创建完成 =================");
+        System.out.println("⏱️ 总耗时: " + durationSeconds + " 秒");
+        System.out.println("✅ 成功数量: " + successCount.get() + " 条");
+        System.out.println("❌ 失败数量: " + failCount.get() + " 条");
+        System.out.println("==================================================");
+    }
+
+    @Test
+    public void testGetAllProjectIssues() {
+        // 1. 基础配置
+        Integer maxResults = 500;       // 每页大小（Jira 一般最大限制 100）
+        String projectKey = "BQKY";     // 你的项目 Key
+        String issueType = "BUG";       // 问题类型
+        SyncAllBugRequest syncRequest = null; // 不需要时间过滤就传 null
+        String fields = null;
+        String nextPageToken = null;
+
+        // 用来存储所有查询到的缺陷
+        List<JiraIssue> allIssues = new ArrayList<>();
+
+        try {
+            int page = 1;
+            do {
+                System.out.println("🔍 正在查询第 " + page + " 页... nextPageToken=" + nextPageToken);
+
+                // 2. 调用接口
+                JiraIssueListResponse result = client.getProjectIssues(
+                        0,          // startAt 已废弃，传 0 即可
+                        maxResults,
+                        projectKey,
+                        issueType,
+                        syncRequest,
+                        fields,
+                        nextPageToken
+                );
+
+                if (result == null || result.getIssues() == null || result.getIssues().isEmpty()) {
+                    System.out.println("📭 本页无数据，结束翻页");
+                    break;
+                }
+
+                // 3. 把当前页数据加入总集合
+                List<JiraIssue> currentPageIssues = result.getIssues();
+                allIssues.addAll(currentPageIssues);
+                System.out.println("✅ 第 " + page + " 页返回：" + currentPageIssues.size() + " 条，累计：" + allIssues.size());
+
+                // 4. 获取下一页 token
+                nextPageToken = result.getNextPageToken();
+                Boolean isLast = result.isLast();
+
+                page++;
+
+                // 5. 终止条件：最后一页 或 没有下一页token
+                if ((isLast != null && isLast) || nextPageToken == null || nextPageToken.isEmpty()) {
+                    System.out.println("\n🎉 已到达最后一页，查询结束！");
+                    break;
+                }
+
+            } while (true);
+
+            // ===================== 最终结果打印 =====================
+            System.out.println("\n========================================");
+            System.out.println("📊 最终查询完成！总共获取缺陷数量：" + allIssues.size());
+            System.out.println("========================================\n");
+
+            // 遍历所有缺陷（可注释掉，避免控制台太多）
+//            for (JiraIssue issue : allIssues) {
+//                System.out.println("缺陷Key: " + issue.getKey() + "  字段: " + issue.getFields());
+//            }
+
+        } catch (Exception e) {
+            System.err.println("❌ 查询失败：" + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
 
 }

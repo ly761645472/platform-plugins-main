@@ -671,8 +671,8 @@ public class JiraDefaultClient extends BaseClient {
      * @param issueType  缺陷类型
      * @return 缺陷集合
      */
-    public JiraIssueListResponse getProjectIssues(Integer startAt, Integer maxResults, String projectKey, String issueType, SyncAllBugRequest syncRequest) {
-        return getProjectIssues(startAt, maxResults, projectKey, issueType, syncRequest, null);
+    public JiraIssueListResponse getProjectIssues(Integer startAt, Integer maxResults, String projectKey, String issueType, SyncAllBugRequest syncRequest, String nextPageToken) {
+        return getProjectIssues(startAt, maxResults, projectKey, issueType, syncRequest, null, nextPageToken);
     }
 
     /**
@@ -691,22 +691,7 @@ public class JiraDefaultClient extends BaseClient {
      *                   }
      * @return 缺陷集合
      */
-    public JiraIssueListResponse getProjectIssues(Integer startAt, Integer maxResults, String projectKey, String issueType, SyncAllBugRequest syncRequest, String fields) {
-        /*ResponseEntity<String> responseEntity;
-        String url = getBaseUrl() + "/search?startAt={1}&maxResults={2}&jql=project={3}+AND+issuetype={4}";
-        if (syncRequest != null && syncRequest.getPre() != null && syncRequest.getCreateTime() != null) {
-            url = url + "+AND+created" + (syncRequest.getPre() ? "<=" : ">=") + "\"" + DateFormatUtils.format(syncRequest.getCreateTime(), "yyyy-MM-dd HH:mm") + "\"";
-        }
-        if (StringUtils.isNotBlank(fields)) {
-            url = url + "&fields=" + fields;
-        } else {
-            // 字段参数默认不传的话使用*all,-comment
-            url = url + "&fields=*all,-comment";
-        }
-        responseEntity = restTemplate.exchange(url,
-                HttpMethod.GET, getAuthHttpEntity(), String.class, startAt, maxResults, projectKey, issueType);
-        return getResultForObject(JiraIssueListResponse.class, responseEntity);*/
-
+    public JiraIssueListResponse getProjectIssues(Integer startAt, Integer maxResults, String projectKey, String issueType, SyncAllBugRequest syncRequest, String fields, String nextPageToken) {
         String url = ENDPOINT + PREFIX_V3 + "/search/jql";
 
         HttpHeaders headers = new HttpHeaders();
@@ -730,6 +715,10 @@ public class JiraDefaultClient extends BaseClient {
         requestBody.put("jql", jqlBuilder.toString());
         // 严格按官方：fields 必须数组
         requestBody.put("fields", StringUtils.isNotBlank(fields) ? fields.split(",") : new String[]{"*all", "-comment"});
+
+        if (nextPageToken != null && !nextPageToken.isEmpty()) {
+            requestBody.put("nextPageToken", nextPageToken);
+        }
 
         HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
         ResponseEntity<String> responseEntity = restTemplate.exchange(
@@ -767,8 +756,8 @@ public class JiraDefaultClient extends BaseClient {
      * @param syncRequest 同步参数
      * @return 返回缺陷附件集合
      */
-    public JiraIssueListResponse getProjectIssuesAttachment(Integer startAt, Integer maxResults, String projectKey, String issueType, SyncAllBugRequest syncRequest) {
-        return getProjectIssues(startAt, maxResults, projectKey, issueType, syncRequest, JiraMetadataField.ATTACHMENT_NAME);
+    public JiraIssueListResponse getProjectIssuesAttachment(Integer startAt, Integer maxResults, String projectKey, String issueType, SyncAllBugRequest syncRequest, String nextPageToken) {
+        return getProjectIssues(startAt, maxResults, projectKey, issueType, syncRequest, JiraMetadataField.ATTACHMENT_NAME, nextPageToken);
     }
 
     /**
@@ -856,4 +845,5 @@ public class JiraDefaultClient extends BaseClient {
             throw new MSPluginException(e.getMessage());
         }
     }
+
 }

@@ -605,16 +605,18 @@ public class JiraPlatform extends AbstractPlatform {
         validateIssueType();
 
         // prepare page param
-        int startAt = 0, maxResults = 5000, currentSize = 0;
+        int startAt = 0, maxResults = 100, currentSize = 0;
+        String nextPageToken = null;
         // default template field
         List<PlatformCustomFieldItemDTO> defaultTemplateCustomField = getDefaultTemplateCustomField(request.getProjectConfig());
+        JiraIssueListResponse result;
         do {
             // prepare post process func param
             List<PlatformBugDTO> needSyncBugs = new ArrayList<>();
             SyncBugResult syncBugResult = new SyncBugResult();
 
             // query jira bug by page
-            JiraIssueListResponse result = jiraClient.getProjectIssues(startAt, maxResults, projectConfig.getJiraKey(), projectConfig.getJiraBugTypeId(), request);
+            result = jiraClient.getProjectIssues(0, maxResults, projectConfig.getJiraKey(), projectConfig.getJiraBugTypeId(), request, nextPageToken);
             List<JiraIssue> jiraIssues = result.getIssues();
             if (CollectionUtils.isEmpty(jiraIssues)) {
                 break;
@@ -627,8 +629,8 @@ public class JiraPlatform extends AbstractPlatform {
                 if (!jiraIssues.get(0).getFields().containsKey(JiraMetadataField.ATTACHMENT_NAME)) {
                     // if jira not support attachment field, query attachment by issue key
                     try {
-                        JiraIssueListResponse response = jiraClient.getProjectIssuesAttachment(startAt, maxResults, projectConfig.getJiraKey(),
-                                projectConfig.getJiraBugTypeId(), request);
+                        JiraIssueListResponse response = jiraClient.getProjectIssuesAttachment(0, maxResults, projectConfig.getJiraKey(),
+                                projectConfig.getJiraBugTypeId(), request, nextPageToken);
                         List<JiraIssue> jiraIssuesWithAttachmentField = response.getIssues();
                         attachmentFieldMap = jiraIssuesWithAttachmentField.stream().collect(Collectors.toMap(JiraIssue::getKey, i -> i.getFields().get(JiraMetadataField.ATTACHMENT_NAME)));
                     } catch (Exception e) {
@@ -672,8 +674,17 @@ public class JiraPlatform extends AbstractPlatform {
             syncPostParamRequest.setNeedSyncBugs(needSyncBugs);
             syncPostParamRequest.setAttachmentMap(syncBugResult.getAttachmentMap());
             request.getSyncPostProcessFunc().accept(syncPostParamRequest);
-            startAt += maxResults;
-        } while (currentSize >= maxResults);
+            // 获取下一页 token 和 是否最后一页
+            Boolean isLast = result.isLast();
+
+            nextPageToken = result.getNextPageToken();
+
+            // 最后一页 或 没有下一页token → 退出循环
+            if (isLast != null && isLast || nextPageToken == null || nextPageToken.isEmpty()) {
+                break;
+            }
+        } while (!Boolean.TRUE.equals(result.isLast())
+                && StringUtils.isNotBlank(nextPageToken));
     }
 
     /**
@@ -2198,7 +2209,7 @@ public class JiraPlatform extends AbstractPlatform {
      * @return
      */
     private String getLuckyKey(JiraProjectConfig projectConfig) {
-        JiraIssueListResponse result = jiraClient.getProjectIssues(0, 1, projectConfig.getJiraKey(), projectConfig.getJiraBugTypeId(), null);
+        JiraIssueListResponse result = jiraClient.getProjectIssues(0, 1, projectConfig.getJiraKey(), projectConfig.getJiraBugTypeId(), null,null);
         List<JiraIssue> jiraIssues = result.getIssues();
         if (CollectionUtils.isEmpty(jiraIssues)) {
             return StringUtils.EMPTY;

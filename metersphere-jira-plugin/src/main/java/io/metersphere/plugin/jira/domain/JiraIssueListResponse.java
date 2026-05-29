@@ -13,4 +13,6 @@ public class JiraIssueListResponse {
     private int maxResults;
     private int total;
     private List<JiraIssue> issues;
+    private String nextPageToken;
+    private boolean isLast;
 }
