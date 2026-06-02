@@ -29,7 +29,7 @@ public class JiraClientTest2 {
     // ====================== 全局配置 ======================
     private static final String JIRA_URL = "https://fit2cloudtest.atlassian.net";
     private static final String EMAIL = "yue.lu@fit2cloud.com";
-    private static final String API_TOKEN = "ATATT3xFfGF0JPmCqYkz2AbJB7o4t4tFEzPP7TGRYrwKBw75zidNY9OPzDkjfvsWbSBR-5MOuybmbXM64RI5Hx_HZQnC8XonT_Q2h3XrolOu0WzV3YgjW9emrNVnPoIyqlES1yTy6F0s-ITFCkUzLrs715PSoRMqDFrTlAB8wKnOXlYHp5kkydQ=CC8265C1";
+    private static final String API_TOKEN = "ATATT3xFfGF0PwDTP1jmfvVtlsrOBvaoggK5yQHo_GRznIjVaaDfs1sTQxVoJw43eAoVKEEEjTTuEI4cjh307D8wY6IUJ2IzzImeg2c3TC9g-FUkz_GBTEOITCP2_uE8Y1vsmE3LJNc8B_JaiJnFq6UfAGW7KtxWEdF_z_WpoxX4l5u6J8bfeqM=3128D35C";
 
     private JiraDefaultClient client;
     private JiraPlatform jiraPlatform;
@@ -499,7 +499,7 @@ public class JiraClientTest2 {
     public void testAllUserSearch() {
         // ====================== 1. 配置测试参数 ======================
         // 注意：留空查询通常会返回大量数据，建议填入关键词进行过滤
-        String queryKeyword = "yue"; // 替换为系统中已知的用户姓名或邮箱关键词
+        String queryKeyword = ""; // 替换为系统中已知的用户姓名或邮箱关键词
 
         try {
             System.out.println("🔍 正在执行全量用户查询，搜索关键词: '" + queryKeyword + "' ...");

@@ -233,7 +233,7 @@ public class JiraDefaultClient extends BaseClient {
      */
     public List<JiraUser> allUserSearch(String query) {
         int startAt = 0;
-        int maxResults = 30;
+        int maxResults = 1000;
         String baseUrl = getBaseUrl() + "/user/search?maxResults=" + maxResults + "&startAt=" + startAt;
         // server 版本没有username报错，报错则加上username
         String url = baseUrl + "&query=" + (StringUtils.isNotBlank(query) ? query : StringUtils.EMPTY);
